@@ -4,6 +4,10 @@ import PackageDescription
 
 let package = Package(
     name: "AsyncSequenceKit",
+    platforms: [
+        .iOS(.v13),
+        .macOS(.v10_15),
+    ],
     products: [
         .library(
             name: "AsyncSequenceKit",
@@ -13,6 +17,9 @@ let package = Package(
         .target(
             name: "AsyncSequenceKit",
             dependencies: []),
+        .testTarget(
+            name: "AsyncSequenceKitTypeCheckingTests",
+            dependencies: ["AsyncSequenceKit"]),
         .testTarget(
             name: "AsyncSequenceKitTests",
             dependencies: ["AsyncSequenceKit"]),
