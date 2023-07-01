@@ -14,30 +14,17 @@ public protocol PublishSubject<Element, Failure>: Subject
     associatedtype Failure
 }
 
-public final class NoThrowPublishSubject<Element>: PublishSubject {
+public struct NoThrowPublishSubject<Element>: PublishSubject {
     public typealias Failure = Never
 
     fileprivate typealias Buffer = _Concurrency.AsyncStream<Element>
     fileprivate typealias Continuation = _Concurrency.AsyncStream<Element>.Continuation
-    fileprivate typealias FinalSelf = NoThrowPublishSubject<Element>
 
     private let lock: NSLock = NSLock()
-    private let buffer: Buffer
-//    private let continuation: Continuation
-    private let asyncIterator: () -> AsyncIterator
-
-    private init(buffer: Buffer,
-                 continuation: Continuation,
-                 asyncIterator: @escaping () -> AsyncIterator) {
-        self.buffer = buffer
-//        self.continuation = continuation
-        self.asyncIterator = asyncIterator
-    }
-
-    private var state: SubjectActiveState = .active
-    private var downstreams: ConduitList<Element, Failure> = .empty
+    private let subscriptionManager: SubscriptionManager
 
     public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
+        fileprivate let buffer: Buffer
         fileprivate var iterator: Buffer.AsyncIterator
 
         public mutating func next() async -> Element? {
@@ -49,22 +36,20 @@ public final class NoThrowPublishSubject<Element>: PublishSubject {
 extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
         self.lock.lock()
-        // TODO: add downstream
         defer { self.lock.unlock() }
-        return self.asyncIterator()
+        var continuation: Buffer.Continuation!
+        let buffer = Buffer(Element.self, bufferingPolicy: .bufferingNewest(0), { continuation = $0 })
+        self.subscriptionManager.add(downstream: continuation)
+        let iterator = buffer.makeAsyncIterator()
+        return AsyncIterator(buffer: buffer, iterator: iterator)
     }
 }
 
 extension NoThrowPublishSubject: Subject {
     public func next(_ value: Element) {
         self.lock.lock()
-        guard self.state.isActive else {
-            self.lock.unlock()
-            return
-        }
-        let downstreams = self.downstreams
-        self.lock.unlock()
-        downstreams.forEach { $0.value(value) }
+        defer { self.lock.unlock() }
+        self.subscriptionManager.value(value)
     }
 
     public func error(_ error: Failure) {
@@ -72,27 +57,56 @@ extension NoThrowPublishSubject: Subject {
 
     public func complete() {
         self.lock.lock()
-        guard self.state.isActive else {
-            self.lock.unlock()
-            return
-        }
-        let downstreams = self.downstreams
-        self.lock.unlock()
-        downstreams.forEach { $0.complete() }
+        defer { self.lock.unlock() }
+        self.subscriptionManager.complete()
     }
 }
 
-//extension NoThrowPublishSubject {
-//    public convenience init() {
-//        var continuation: Continuation!
-//        let buffer = Buffer(Element.self, bufferingPolicy: .bufferingNewest(0), { continuation = $0 })
-//        self.init(
-//            buffer: buffer,
-//            continuation: continuation,
-//            asyncIterator: {
-//                let iterator = buffer.makeAsyncIterator()
-//                return .init(iterator: iterator)
-//            }
-//        )
-//    }
-//}
+extension NoThrowPublishSubject {
+    fileprivate final class SubscriptionManager {
+        typealias DownstreamID = UInt
+
+        private let lock: NSLock = NSLock()
+        private var state: SubjectActiveState = .active
+        private var downstreams: [DownstreamID: Buffer.Continuation] = [:]
+        private var nextDownstreamID: DownstreamID = 0
+
+        func add(downstream: Buffer.Continuation) {
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            let id = self.nextDownstreamID
+            self.downstreams[id] = downstream
+            self.nextDownstreamID += 1
+        }
+
+        func value(_ value: Element) {
+            self.lock.lock()
+            defer { self.lock.unlock() }
+
+            guard self.state.isActive else { return }
+            self.downstreams.values.forEach { continuation in
+                continuation.yield(value)
+            }
+        }
+
+        func error(_ error: Failure) {}
+
+        func complete() {
+            self.lock.lock()
+            defer { self.lock.unlock() }
+
+            guard self.state.isActive else { return }
+            self.downstreams.values.forEach { continuation in
+                continuation.finish()
+            }
+
+            self.state.deactivate()
+        }
+    }
+}
+
+extension NoThrowPublishSubject {
+    public init() {
+        self.init(subscriptionManager: SubscriptionManager())
+    }
+}
