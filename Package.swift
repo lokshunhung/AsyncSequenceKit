@@ -16,12 +16,20 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "_Playground",
-            dependencies: ["AsyncSequenceKit"]),
+            dependencies: [
+                "AsyncSequenceKit",
+                "Producer",
+            ]),
+
         .target(
             name: "AsyncSequenceKit",
             dependencies: []),
         .testTarget(
             name: "AsyncSequenceKitTests",
             dependencies: ["AsyncSequenceKit"]),
+
+        .target(
+            name: "Producer",
+            dependencies: []),
     ]
 )
