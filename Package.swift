@@ -16,12 +16,18 @@ let package = Package(
     targets: [
         .target(
             name: "AsyncSequenceKit",
+            dependencies: [
+                "_AsyncSequenceKitTypeErasure",
+            ]),
+
+        .target(
+            name: "_AsyncSequenceKitTypeErasure",
             dependencies: []),
         .testTarget(
-            name: "AsyncSequenceKitTypeCheckingTests",
-            dependencies: ["AsyncSequenceKit"]),
+            name: "_AsyncSequenceKitTypeErasureTypeCheckingTests",
+            dependencies: ["_AsyncSequenceKitTypeErasure"]),
         .testTarget(
-            name: "AsyncSequenceKitTests",
-            dependencies: ["AsyncSequenceKit"]),
+            name: "_AsyncSequenceKitTypeErasureTests",
+            dependencies: ["_AsyncSequenceKitTypeErasure"]),
     ]
 )
