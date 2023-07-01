@@ -24,6 +24,10 @@ public protocol Producer<Element, Failure> {
 }
 
 extension Producer {
+    public func eraseToProducer() -> AnyProducer<Element, Failure> {
+        return AnyProducer(producer: self)
+    }
+
     public func subscribe(_ subscriber: Subscriber) -> Subscription {
         return self.receive(subscriber: subscriber)
     }
@@ -68,9 +72,36 @@ private final class AnyProducerBoxImpl<T: Producer>: AnyProducerBox<T.Element, T
 
 // MARK: - AsyncSequence
 
+public struct AsyncSequenceProducer<Element, Failure: Swift.Error>: Producer {
+    private let receiveSubscriber: (Subscriber) -> Subscription
+
+    init<T: AsyncSequence>(_ asyncSequence: T) where T.Element == Element {
+        self.receiveSubscriber = { subscriber in
+            Task(priority: nil, operation: {
+                do {
+                    for try await element in asyncSequence {
+                        subscriber.value?(element)
+                    }
+                    subscriber.complete?()
+                } catch let error as Failure {
+                    subscriber.error?(error)
+                }
+            })
+        }
+    }
+
+    public func receive(subscriber: Consumer<Element, Failure>) -> Subscription {
+        self.receiveSubscriber(subscriber)
+    }
+}
+
 extension AsyncSequence {
     public func eraseToProducer() -> AnyProducer<Element, Swift.Error> {
-        fatalError()
+        return AsyncSequenceProducer(self).eraseToProducer()
+    }
+
+    public func eraseToProducer<Failure: Swift.Error>() -> AnyProducer<Element, Failure> {
+        return AsyncSequenceProducer(self).eraseToProducer()
     }
 }
 
