@@ -6,3 +6,4 @@
 //
 
 @_exported import _AsyncSequenceKitTypeErasure
+@_exported import _AsyncSequenceKitSubject
