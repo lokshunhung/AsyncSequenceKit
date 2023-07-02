@@ -33,23 +33,26 @@ public struct NoThrowPublishSubject<Element>: PublishSubject {
     }
 }
 
-extension NoThrowPublishSubject.AsyncIterator {
-    fileprivate init(subscriptionManager: NoThrowPublishSubject.SubscriptionManager) {
-        let (buffer, continuation) = NoThrowPublishSubject.Buffer.makeStream(of: Element.self, bufferingPolicy: .unbounded)
-        let downstreamID = subscriptionManager.add(downstream: continuation)
-        continuation.onTermination = { [weak subscriptionManager] reason in
-            subscriptionManager?.remove(downstream: downstreamID)
-        }
-        let iterator = buffer.makeAsyncIterator()
-        self.init(buffer: buffer, iterator: iterator)
-    }
-}
-
 extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
         self.lock.lock()
         defer { self.lock.unlock() }
-        return AsyncIterator(subscriptionManager: self.subscriptionManager)
+
+        let (buffer, continuation) = Buffer.makeStream(of: Element.self, bufferingPolicy: .unbounded)
+        let downstreamID = subscriptionManager.add(downstream: continuation)
+
+        // AsyncSequence.makeAsyncIterator() is where an async iteration is requested.
+        // This is analogous to RxSwift.Observable.subscribe() or Combine.Publisher.sink()
+        //
+        // Like RxSwift.Disposable or Combine.Cancellable to hold/trigger cleanup logic,
+        // continuation.onTermination stores the cleanup logic
+        // when the async iteration is terminated (e.g. enclosing Task is cancelled).
+        continuation.onTermination = { [weak subscriptionManager] reason in
+            subscriptionManager?.remove(downstream: downstreamID)
+        }
+
+        let iterator = buffer.makeAsyncIterator()
+        return AsyncIterator(buffer: buffer, iterator: iterator)
     }
 }
 
@@ -71,6 +74,7 @@ extension NoThrowPublishSubject: Subject {
 }
 
 extension NoThrowPublishSubject {
+    // TODO: refactor to generic using a conduit, instead of relying on concrete Buffer.Continuation
     fileprivate final class SubscriptionManager {
         typealias DownstreamID = UInt
 
@@ -116,6 +120,7 @@ extension NoThrowPublishSubject {
         }
     }
 
+    // TODO: refactor to generic
     fileprivate enum DownstreamStorage {
         typealias ID = UInt
         typealias Element = Buffer.Continuation
