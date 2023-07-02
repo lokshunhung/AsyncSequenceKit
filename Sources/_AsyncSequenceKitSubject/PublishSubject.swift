@@ -33,17 +33,23 @@ public struct NoThrowPublishSubject<Element>: PublishSubject {
     }
 }
 
-extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
-    public func makeAsyncIterator() -> AsyncIterator {
-        self.lock.lock()
-        defer { self.lock.unlock() }
-        let (buffer, continuation) = Buffer.makeStream(of: Element.self, bufferingPolicy: .unbounded)
-        let downstreamID = self.subscriptionManager.add(downstream: continuation)
+extension NoThrowPublishSubject.AsyncIterator {
+    fileprivate init(subscriptionManager: NoThrowPublishSubject.SubscriptionManager) {
+        let (buffer, continuation) = NoThrowPublishSubject.Buffer.makeStream(of: Element.self, bufferingPolicy: .unbounded)
+        let downstreamID = subscriptionManager.add(downstream: continuation)
         continuation.onTermination = { [weak subscriptionManager] reason in
             subscriptionManager?.remove(downstream: downstreamID)
         }
         let iterator = buffer.makeAsyncIterator()
-        return AsyncIterator(buffer: buffer, iterator: iterator)
+        self.init(buffer: buffer, iterator: iterator)
+    }
+}
+
+extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
+    public func makeAsyncIterator() -> AsyncIterator {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        return AsyncIterator(subscriptionManager: self.subscriptionManager)
     }
 }
 
