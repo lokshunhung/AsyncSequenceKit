@@ -144,28 +144,20 @@ extension NoThrowPublishSubject {
             }
         }
 
-        @discardableResult
-        mutating func remove(_ id: ID) -> Element? {
+        mutating func remove(_ id: ID) {
             switch self {
             case .empty:
-                return nil
-            case .single(let existingID, let existingElement):
-                guard id == existingID else {
-                    return nil
-                }
+                return
+            case .single(let existingID, _):
+                guard id == existingID else { return }
                 self = .empty
-                return existingElement
             case .many(var storage, let nextID):
-                guard let element = storage[id] else {
-                    return nil
-                }
-                storage[id] = nil
+                guard storage.removeValue(forKey: id) != nil else { return }
                 if storage.isEmpty {
                     self = .empty
                 } else {
                     self = .many(storage, nextID: nextID)
                 }
-                return element
             }
         }
 
