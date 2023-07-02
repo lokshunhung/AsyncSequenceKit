@@ -94,8 +94,7 @@ extension NoThrowBehaviorSubject: BehaviorSubject {
 
 extension NoThrowBehaviorSubject {
     public convenience init(_ value: Element) {
-        var continuation: Continuation!
-        let buffer = Buffer(Element.self, bufferingPolicy: .bufferingNewest(1), { continuation = $0 })
+        let (buffer, continuation) = Buffer.makeStream(of: Element.self, bufferingPolicy: .bufferingNewest(1))
         self.init(
             currentValue: value,
             buffer: buffer, // TODO: Important: shared buffer?

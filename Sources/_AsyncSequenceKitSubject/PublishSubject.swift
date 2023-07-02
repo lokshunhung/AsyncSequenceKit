@@ -37,8 +37,7 @@ extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
         self.lock.lock()
         defer { self.lock.unlock() }
-        var continuation: Buffer.Continuation!
-        let buffer = Buffer(Element.self, bufferingPolicy: .bufferingNewest(0), { continuation = $0 })
+        let (buffer, continuation) = Buffer.makeStream(of: Element.self, bufferingPolicy: .unbounded)
         self.subscriptionManager.add(downstream: continuation)
         let iterator = buffer.makeAsyncIterator()
         return AsyncIterator(buffer: buffer, iterator: iterator)
