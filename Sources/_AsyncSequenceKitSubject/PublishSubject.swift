@@ -38,7 +38,10 @@ extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
         self.lock.lock()
         defer { self.lock.unlock() }
         let (buffer, continuation) = Buffer.makeStream(of: Element.self, bufferingPolicy: .unbounded)
-        self.subscriptionManager.add(downstream: continuation)
+        let downstreamID = self.subscriptionManager.add(downstream: continuation)
+        continuation.onTermination = { [weak subscriptionManager] reason in
+            subscriptionManager?.remove(downstream: downstreamID)
+        }
         let iterator = buffer.makeAsyncIterator()
         return AsyncIterator(buffer: buffer, iterator: iterator)
     }
@@ -70,12 +73,19 @@ extension NoThrowPublishSubject {
         private var downstreams: [DownstreamID: Buffer.Continuation] = [:]
         private var nextDownstreamID: DownstreamID = 0
 
-        func add(downstream: Buffer.Continuation) {
+        func add(downstream: Buffer.Continuation) -> DownstreamID {
             self.lock.lock()
             defer { self.lock.unlock() }
             let id = self.nextDownstreamID
             self.downstreams[id] = downstream
             self.nextDownstreamID += 1
+            return id
+        }
+
+        func remove(downstream id: DownstreamID) {
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            self.downstreams[id] = nil
         }
 
         func value(_ value: Element) {
