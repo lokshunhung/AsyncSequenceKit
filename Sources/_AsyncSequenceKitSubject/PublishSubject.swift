@@ -57,7 +57,7 @@ extension NoThrowPublishSubject: Subject {
     public func next(_ value: Element) {
         self.lock.lock()
         defer { self.lock.unlock() }
-        self.subscriptionManager.value(value)
+        self.subscriptionManager.next(value)
     }
 
     public func error(_ error: Failure) {
@@ -91,7 +91,7 @@ extension NoThrowPublishSubject {
             self.downstreams.remove(id)
         }
 
-        func value(_ value: Element) {
+        func next(_ value: Element) {
             self.lock.lock()
             defer { self.lock.unlock() }
 
