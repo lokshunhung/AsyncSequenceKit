@@ -84,7 +84,7 @@ extension NoThrowPublishSubject {
             defer { self.lock.unlock() }
             let id = self.nextDownstreamID
             self.downstreams[id] = downstream
-            self.nextDownstreamID += 1
+            self.nextDownstreamID &+= 1
             return id
         }
 
