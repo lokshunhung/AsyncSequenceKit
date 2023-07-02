@@ -60,6 +60,7 @@ internal enum ConduitDictionary<T>
             guard id == existingID else {
                 return nil
             }
+            self = .empty
             return existingElement
         case .many(var storage, var ids, let nextID):
             guard let element = storage[id] else {
@@ -67,7 +68,11 @@ internal enum ConduitDictionary<T>
             }
             storage[id] = nil
             ids[element] = nil
-            self = .many(storage: storage, ids: ids, nextID: nextID)
+            if storage.isEmpty, ids.isEmpty {
+                self = .empty
+            } else {
+                self = .many(storage: storage, ids: ids, nextID: nextID)
+            }
             return element
         }
     }
@@ -75,7 +80,7 @@ internal enum ConduitDictionary<T>
     internal func forEach(_ body: (T) throws -> Void) rethrows {
         switch self {
         case .empty:
-            return
+            break
         case .single(_, let element):
             try body(element)
         case .many(let storage, _, _):

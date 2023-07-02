@@ -76,22 +76,19 @@ extension NoThrowPublishSubject {
 
         private let lock: NSLock = NSLock()
         private var state: SubjectActiveState = .active
-        private var downstreams: [DownstreamID: Buffer.Continuation] = [:]
-        private var nextDownstreamID: DownstreamID = 0
+        private var downstreams: DownstreamStorage = .empty
 
         func add(downstream: Buffer.Continuation) -> DownstreamID {
             self.lock.lock()
             defer { self.lock.unlock() }
-            let id = self.nextDownstreamID
-            self.downstreams[id] = downstream
-            self.nextDownstreamID &+= 1
+            let id = self.downstreams.add(downstream)
             return id
         }
 
         func remove(downstream id: DownstreamID) {
             self.lock.lock()
             defer { self.lock.unlock() }
-            self.downstreams[id] = nil
+            self.downstreams.remove(id)
         }
 
         func value(_ value: Element) {
@@ -99,7 +96,7 @@ extension NoThrowPublishSubject {
             defer { self.lock.unlock() }
 
             guard self.state.isActive else { return }
-            self.downstreams.values.forEach { continuation in
+            self.downstreams.forEach { continuation in
                 continuation.yield(value)
             }
         }
@@ -111,11 +108,76 @@ extension NoThrowPublishSubject {
             defer { self.lock.unlock() }
 
             guard self.state.isActive else { return }
-            self.downstreams.values.forEach { continuation in
+            self.downstreams.forEach { continuation in
                 continuation.finish()
             }
 
             self.state.deactivate()
+        }
+    }
+
+    fileprivate enum DownstreamStorage {
+        typealias ID = UInt
+        typealias Element = Buffer.Continuation
+
+        case empty
+        case single(ID, Element)
+        case many([ID: Element], nextID: ID)
+
+        mutating func add(_ element: Element) -> ID {
+            switch self {
+            case .empty:
+                let id: ID = 0
+                self = .single(id, element)
+                return id
+            case .single(let existingID, let existingElement):
+                let id = existingID &+ 1
+                let storage = [existingID: existingElement, id: element]
+                let nextID = id &+ 1
+                self = .many(storage, nextID: nextID)
+                return id
+            case .many(var storage, let id):
+                storage[id] = element
+                let nextID = id &+ 1
+                self = .many(storage, nextID: nextID)
+                return id
+            }
+        }
+
+        @discardableResult
+        mutating func remove(_ id: ID) -> Element? {
+            switch self {
+            case .empty:
+                return nil
+            case .single(let existingID, let existingElement):
+                guard id == existingID else {
+                    return nil
+                }
+                self = .empty
+                return existingElement
+            case .many(var storage, let nextID):
+                guard let element = storage[id] else {
+                    return nil
+                }
+                storage[id] = nil
+                if storage.isEmpty {
+                    self = .empty
+                } else {
+                    self = .many(storage, nextID: nextID)
+                }
+                return element
+            }
+        }
+
+        func forEach(_ body: (Element) throws -> Void) rethrows {
+            switch self {
+            case .empty:
+                break
+            case .single(_, let element):
+                try body(element)
+            case .many(let storage, _):
+                try storage.values.forEach(body)
+            }
         }
     }
 }
