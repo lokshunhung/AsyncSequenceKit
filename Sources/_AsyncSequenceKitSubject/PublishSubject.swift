@@ -76,7 +76,8 @@ extension NoThrowPublishSubject: Subject {
 extension NoThrowPublishSubject {
     // TODO: refactor to generic using a conduit, instead of relying on concrete Buffer.Continuation
     fileprivate final class SubscriptionManager {
-        typealias DownstreamID = UInt
+        typealias DownstreamStorage = Bag<Buffer.Continuation>
+        typealias DownstreamID = DownstreamStorage.Key
 
         private let lock: NSLock = NSLock()
         private var state: SubjectActiveState = .active
@@ -117,64 +118,6 @@ extension NoThrowPublishSubject {
             }
 
             self.state.deactivate()
-        }
-    }
-
-    // TODO: refactor to generic
-    fileprivate enum DownstreamStorage {
-        typealias ID = UInt
-        typealias Element = Buffer.Continuation
-
-        case empty
-        case single(ID, Element)
-        case many([ID: Element], nextID: ID)
-
-        mutating func add(_ element: Element) -> ID {
-            switch self {
-            case .empty:
-                let id: ID = 0
-                self = .single(id, element)
-                return id
-            case .single(let existingID, let existingElement):
-                let id = existingID &+ 1
-                let storage = [existingID: existingElement, id: element]
-                let nextID = id &+ 1
-                self = .many(storage, nextID: nextID)
-                return id
-            case .many(var storage, let id):
-                storage[id] = element
-                let nextID = id &+ 1
-                self = .many(storage, nextID: nextID)
-                return id
-            }
-        }
-
-        mutating func remove(_ id: ID) {
-            switch self {
-            case .empty:
-                return
-            case .single(let existingID, _):
-                guard id == existingID else { return }
-                self = .empty
-            case .many(var storage, let nextID):
-                guard storage.removeValue(forKey: id) != nil else { return }
-                if storage.isEmpty {
-                    self = .empty
-                } else {
-                    self = .many(storage, nextID: nextID)
-                }
-            }
-        }
-
-        func forEach(_ body: (Element) throws -> Void) rethrows {
-            switch self {
-            case .empty:
-                break
-            case .single(_, let element):
-                try body(element)
-            case .many(let storage, _):
-                try storage.values.forEach(body)
-            }
         }
     }
 }
