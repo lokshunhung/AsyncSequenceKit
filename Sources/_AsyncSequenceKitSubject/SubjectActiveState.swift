@@ -23,31 +23,10 @@ internal enum SubjectActiveState {
     }
 
     @usableFromInline
-    internal mutating func deactivate() {
+    mutating func deactivate() {
         guard case .active = self else {
             fatalError("SubjectActiveState already transitioned to .inactive, but deactivate() is called again")
         }
         self = .inactive
     }
 }
-
-//extension SubjectActiveState: RawRepresentable {
-//    @usableFromInline
-//    internal init?(rawValue: Bool) {
-//        if rawValue {
-//            self = .active
-//        } else {
-//            self = .inactive
-//        }
-//    }
-//
-//    @usableFromInline
-//    internal var rawValue: Bool {
-//        switch self {
-//        case .active:
-//            return true
-//        case .inactive:
-//            return false
-//        }
-//    }
-//}
