@@ -118,6 +118,7 @@ extension NoThrowPublishSubject {
             }
 
             self.state.deactivate()
+            self.downstreams.removeAll()
         }
     }
 }
