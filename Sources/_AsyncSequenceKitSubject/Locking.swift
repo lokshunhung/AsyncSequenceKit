@@ -39,6 +39,7 @@ internal final class AllocatedLock {
 
     deinit {
         _deinitialize(lock: self.ptr)
+        self.ptr.deinitialize(count: 1)
     }
 
     func lock() {
@@ -72,7 +73,6 @@ private func _deinitialize(lock ptr: AllocatedLock.Ptr) {
     #if canImport(Glibc)
     pthread_mutex_destroy(ptr)
     #endif
-    ptr.deinitialize(count: 1)
 }
 
 @inline(__always)
