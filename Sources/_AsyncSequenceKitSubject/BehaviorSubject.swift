@@ -23,7 +23,7 @@ public final class NoThrowBehaviorSubject<Element> {
     fileprivate typealias Continuation = _Concurrency.AsyncStream<Element>.Continuation
     fileprivate typealias FinalSelf = NoThrowBehaviorSubject<Element>
 
-    private let lock: NSLock = NSLock()
+    private let lock: AllocatedLock = .new()
     private var currentValue: Element
     private let buffer: Buffer
     private let continuation: Continuation

@@ -20,7 +20,7 @@ public struct NoThrowPublishSubject<Element>: PublishSubject {
     fileprivate typealias Buffer = _Concurrency.AsyncStream<Element>
     fileprivate typealias Continuation = _Concurrency.AsyncStream<Element>.Continuation
 
-    private let lock: NSLock = NSLock()
+    private let lock: AllocatedLock = .new()
     private let subscriptionManager: SubscriptionManager
 
     public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
@@ -79,7 +79,7 @@ extension NoThrowPublishSubject {
         typealias DownstreamStorage = Bag<Buffer.Continuation>
         typealias DownstreamID = DownstreamStorage.Key
 
-        private let lock: Lock = .allocate()
+        private let lock: AllocatedLock = .new()
         private var state: SubjectActiveState = .active
         private var downstreams: DownstreamStorage = .empty
 

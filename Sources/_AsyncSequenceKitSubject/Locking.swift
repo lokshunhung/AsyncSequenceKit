@@ -14,122 +14,85 @@
 @_implementationOnly import WinSDK
 #endif
 
-internal struct Lock {
-    #if canImport(Darwin)
-    typealias Primitive = os_unfair_lock
-    #elseif canImport(Glibc)
-    typealias Primitive = pthread_mutex_t
-    #elseif canImport(WinSDK)
-    typealias Primitive = SRWLOCK
-    #endif
+#if canImport(Darwin)
+typealias LockPrimitive = os_unfair_lock
+#elseif canImport(Glibc)
+typealias LockPrimitive = pthread_mutex_t
+#elseif canImport(WinSDK)
+typealias LockPrimitive = SRWLOCK
+#endif
 
-    typealias PlatformLock = UnsafeMutablePointer<Primitive>
-    let platformLock: PlatformLock
+internal final class AllocatedLock {
+    typealias Ptr = UnsafeMutablePointer<LockPrimitive>
 
-    private init(_ platformLock: PlatformLock) {
-        self.platformLock = platformLock
+    private let ptr: Ptr
+
+    init(ptr: Ptr) {
+        self.ptr = ptr
     }
 
-    fileprivate static func initialize(_ platformLock: PlatformLock) {
-        #if canImport(Darwin)
-        platformLock.initialize(to: os_unfair_lock())
-        #elseif canImport(Glibc)
-        pthread_mutex_init(platformLock, nil)
-        #elseif canImport(WinSDK)
-        InitializeSRWLock(platformLock)
-        #endif
+    static func new() -> Self {
+        let ptr = Ptr.allocate(capacity: 1)
+        _initialize(lock: ptr)
+        return self.init(ptr: ptr)
     }
 
-    fileprivate static func deinitialize(_ platformLock: PlatformLock) {
-        #if canImport(Glibc)
-        pthread_mutex_destroy(platformLock)
-        #endif
-        platformLock.deinitialize(count: 1)
-    }
-
-    fileprivate static func lock(_ platformLock: PlatformLock) {
-        #if canImport(Darwin)
-        os_unfair_lock_lock(platformLock)
-        #elseif canImport(Glibc)
-        pthread_mutex_lock(platformLock)
-        #elseif canImport(WinSDK)
-        AcquireSRWLockExclusive(platformLock)
-        #endif
-    }
-
-    fileprivate static func unlock(_ platformLock: PlatformLock) {
-        #if canImport(Darwin)
-        os_unfair_lock_unlock(platformLock)
-        #elseif canImport(Glibc)
-        pthread_mutex_unlock(platformLock)
-        #elseif canImport(WinSDK)
-        ReleaseSRWLockExclusive(platformLock)
-        #endif
-    }
-
-    static func allocate() -> Lock {
-        let platformLock = PlatformLock.allocate(capacity: 1)
-        initialize(platformLock)
-        return Lock(platformLock)
-    }
-
-    func deinitialize() {
-        Lock.deinitialize(platformLock)
+    deinit {
+        _deinitialize(lock: self.ptr)
     }
 
     func lock() {
-        Lock.lock(platformLock)
+        _lock(lock: self.ptr)
     }
 
     func unlock() {
-        Lock.unlock(platformLock)
+        _unlock(lock: self.ptr)
     }
 
-    /// Acquire the lock for the duration of the given block.
-    ///
-    /// This convenience method should be preferred to `lock` and `unlock` in
-    /// most situations, as it ensures that the lock will be released regardless
-    /// of how `body` exits.
-    ///
-    /// - Parameter body: The block to execute while holding the lock.
-    /// - Returns: The value returned by the block.
-    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+    func withLock<R>(_ body: () throws -> R) rethrows -> R {
         self.lock()
         defer { self.unlock() }
         return try body()
     }
 }
 
-//struct Synchronized<T> {
-//    private final class LockBuffer: ManagedBuffer<T, Lock.Primitive> {
-//        @inline(__always) @usableFromInline
-//        static func create(initialValue: T) -> ManagedBuffer<T, Lock.Primitive> {
-//            return Self.create(minimumCapacity: 1, makingHeaderWith: { buffer in
-//                buffer.withUnsafeMutablePointerToElements { platformLock in
-//                    Lock.initialize(platformLock)
-//                }
-//                return initialValue
-//            })
-//        }
-//
-//        deinit {
-//            withUnsafeMutablePointerToElements { platformLock in
-//                Lock.deinitialize(platformLock)
-//            }
-//        }
-//    }
-//
-//    private let buffer: ManagedBuffer<T, Lock.Primitive>
-//
-//    init(_ initialValue: T) {
-//        self.buffer = LockBuffer.create(initialValue: initialValue)
-//    }
-//
-//    func synchronized<R>(_ body: (inout T) throws -> R) rethrows -> R {
-//        try self.buffer.withUnsafeMutablePointers { (header: UnsafeMutablePointer<T>, platformLock: UnsafeMutablePointer<Lock.Primitive>) in
-//            Lock.lock(platformLock)
-//            defer { Lock.unlock(platformLock) }
-//            return try body(&header.pointee)
-//        }
-//    }
-//}
+@inline(__always)
+private func _initialize(lock ptr: AllocatedLock.Ptr) {
+    #if canImport(Darwin)
+    ptr.initialize(to: os_unfair_lock())
+    #elseif canImport(Glibc)
+    pthread_mutex_init(ptr, nil)
+    #elseif canImport(WinSDK)
+    InitializeSRWLock(ptr)
+    #endif
+}
+
+@inline(__always)
+private func _deinitialize(lock ptr: AllocatedLock.Ptr) {
+    #if canImport(Glibc)
+    pthread_mutex_destroy(ptr)
+    #endif
+    ptr.deinitialize(count: 1)
+}
+
+@inline(__always)
+private func _lock(lock ptr: AllocatedLock.Ptr) {
+    #if canImport(Darwin)
+    os_unfair_lock_lock(ptr)
+    #elseif canImport(Glibc)
+    pthread_mutex_lock(ptr)
+    #elseif canImport(WinSDK)
+    AcquireSRWLockExclusive(ptr)
+    #endif
+}
+
+@inline(__always)
+private func _unlock(lock ptr: AllocatedLock.Ptr) {
+    #if canImport(Darwin)
+    os_unfair_lock_unlock(ptr)
+    #elseif canImport(Glibc)
+    pthread_mutex_unlock(ptr)
+    #elseif canImport(WinSDK)
+    ReleaseSRWLockExclusive(ptr)
+    #endif
+}
