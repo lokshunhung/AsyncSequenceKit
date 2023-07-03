@@ -79,46 +79,43 @@ extension NoThrowPublishSubject {
         typealias DownstreamStorage = Bag<Buffer.Continuation>
         typealias DownstreamID = DownstreamStorage.Key
 
-        private let lock: NSLock = NSLock()
+        private let lock: Lock = .allocate()
         private var state: SubjectActiveState = .active
         private var downstreams: DownstreamStorage = .empty
 
         func add(downstream: Buffer.Continuation) -> DownstreamID {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            let id = self.downstreams.add(downstream)
-            return id
+            return self.lock.withLock {
+                self.downstreams.add(downstream)
+            }
         }
 
         func remove(downstream id: DownstreamID) {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            self.downstreams.remove(id)
+            self.lock.withLock {
+                self.downstreams.remove(id)
+            }
         }
 
         func next(_ value: Element) {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-
-            guard self.state.isActive else { return }
-            self.downstreams.forEach { continuation in
-                continuation.yield(value)
+            self.lock.withLock {
+                guard self.state.isActive else { return }
+                self.downstreams.forEach { continuation in
+                    continuation.yield(value)
+                }
             }
         }
 
         func error(_ error: Failure) {}
 
         func complete() {
-            self.lock.lock()
-            defer { self.lock.unlock() }
+            self.lock.withLock {
+                guard self.state.isActive else { return }
+                self.downstreams.forEach { continuation in
+                    continuation.finish()
+                }
 
-            guard self.state.isActive else { return }
-            self.downstreams.forEach { continuation in
-                continuation.finish()
+                self.state.deactivate()
+                self.downstreams.removeAll()
             }
-
-            self.state.deactivate()
-            self.downstreams.removeAll()
         }
     }
 }
