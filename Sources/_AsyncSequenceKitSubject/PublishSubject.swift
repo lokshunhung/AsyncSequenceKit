@@ -76,14 +76,15 @@ extension NoThrowPublishSubject: Subject {
 extension NoThrowPublishSubject {
     // TODO: refactor to generic using a conduit, instead of relying on concrete Buffer.Continuation
     fileprivate final class SubscriptionManager {
-        typealias DownstreamStorage = Bag<Buffer.Continuation>
+        typealias Downstream = Buffer.Continuation
+        typealias DownstreamStorage = Bag<Downstream>
         typealias DownstreamID = DownstreamStorage.Key
 
         private let lock: AllocatedLock = .new()
         private var state: SubjectActiveState = .active
         private var downstreams: DownstreamStorage = .empty
 
-        func add(downstream: Buffer.Continuation) -> DownstreamID {
+        func add(downstream: Downstream) -> DownstreamID {
             return self.lock.withLock {
                 self.downstreams.add(downstream)
             }
