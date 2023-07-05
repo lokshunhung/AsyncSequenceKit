@@ -14,6 +14,8 @@
 @_implementationOnly import WinSDK
 #endif
 
+// MARK: - LockPrimitive
+
 #if canImport(Darwin)
 typealias LockPrimitive = os_unfair_lock
 #elseif canImport(Glibc)
@@ -22,17 +24,19 @@ typealias LockPrimitive = pthread_mutex_t
 typealias LockPrimitive = SRWLOCK
 #endif
 
+internal typealias LockPtr = UnsafeMutablePointer<LockPrimitive>
+
+// MARK: - AllocatedLock
+
 internal final class AllocatedLock {
-    typealias Ptr = UnsafeMutablePointer<LockPrimitive>
+    private let ptr: LockPtr
 
-    private let ptr: Ptr
-
-    init(ptr: Ptr) {
+    private init(ptr: LockPtr) {
         self.ptr = ptr
     }
 
     static func new() -> Self {
-        let ptr = Ptr.allocate(capacity: 1)
+        let ptr = LockPtr.allocate(capacity: 1)
         _initialize(lock: ptr)
         return self.init(ptr: ptr)
     }
@@ -57,8 +61,44 @@ internal final class AllocatedLock {
     }
 }
 
+// MARK: - Lockable<State>
+
+internal struct Lockable<State> {
+    private typealias StatePtr = UnsafeMutablePointer<State>
+    private typealias Buffer = ManagedBuffer<State, LockPrimitive>
+
+    private let buffer: Buffer
+
+    init(_ state: State) {
+        self.buffer = RefCountBuffer.create(minimumCapacity: 1, makingHeaderWith: { (buffer: Buffer) in
+            buffer.withUnsafeMutablePointerToElements { (lock: LockPtr) in
+                _initialize(lock: lock)
+            }
+            return state
+        })
+    }
+
+    func withLock<R>(_ body: (inout State) throws -> R) rethrows -> R {
+        return try self.buffer.withUnsafeMutablePointers { (state: StatePtr, lock: LockPtr) in
+            _lock(lock: lock)
+            defer { _unlock(lock: lock) }
+            return try body(&state.pointee)
+        }
+    }
+
+    private final class RefCountBuffer: ManagedBuffer<State, LockPrimitive> {
+        deinit { // lifecycle managed with reference counting
+            self.withUnsafeMutablePointerToElements { (lock: LockPtr) in
+                _deinitialize(lock: lock)
+            }
+        }
+    }
+}
+
+// MARK: - lock pointer implementation from apple/swift-async-algorithm
+
 @inline(__always)
-private func _initialize(lock ptr: AllocatedLock.Ptr) {
+private func _initialize(lock ptr: LockPtr) {
     #if canImport(Darwin)
     ptr.initialize(to: os_unfair_lock())
     #elseif canImport(Glibc)
@@ -69,14 +109,14 @@ private func _initialize(lock ptr: AllocatedLock.Ptr) {
 }
 
 @inline(__always)
-private func _deinitialize(lock ptr: AllocatedLock.Ptr) {
+private func _deinitialize(lock ptr: LockPtr) {
     #if canImport(Glibc)
     pthread_mutex_destroy(ptr)
     #endif
 }
 
 @inline(__always)
-private func _lock(lock ptr: AllocatedLock.Ptr) {
+private func _lock(lock ptr: LockPtr) {
     #if canImport(Darwin)
     os_unfair_lock_lock(ptr)
     #elseif canImport(Glibc)
@@ -87,7 +127,7 @@ private func _lock(lock ptr: AllocatedLock.Ptr) {
 }
 
 @inline(__always)
-private func _unlock(lock ptr: AllocatedLock.Ptr) {
+private func _unlock(lock ptr: LockPtr) {
     #if canImport(Darwin)
     os_unfair_lock_unlock(ptr)
     #elseif canImport(Glibc)
