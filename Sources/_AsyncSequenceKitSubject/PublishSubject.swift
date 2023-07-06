@@ -58,18 +58,18 @@ extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
 
 extension NoThrowPublishSubject: Subject {
     public func next(_ value: Element) {
-        self.lock.lock()
-        defer { self.lock.unlock() }
-        self.subscriptionManager.next(value)
+        self.lock.withLock {
+            self.subscriptionManager.next(value)
+        }
     }
 
     public func error(_ error: Failure) {
     }
 
     public func complete() {
-        self.lock.lock()
-        defer { self.lock.unlock() }
-        self.subscriptionManager.complete()
+        self.lock.withLock {
+            self.subscriptionManager.complete()
+        }
     }
 }
 
