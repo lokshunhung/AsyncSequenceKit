@@ -23,6 +23,14 @@ public struct DoThrowAsyncItr<Element>: _Concurrency.AsyncIteratorProtocol {
     }
 }
 
+extension DoThrowAsyncSeq {
+    public init(unfolding factory: @escaping () -> () async throws -> Element?) {
+        self.init(asyncIterator: {
+            .init(nextElement: factory())
+        })
+    }
+}
+
 extension _Concurrency.AsyncSequence {
     /// Wraps the async sequence inside a type-erased wrapper that **might throw**.
     ///
@@ -39,9 +47,9 @@ extension _Concurrency.AsyncSequence {
     /// - SeeAlso: ``DoThrowAsyncItr``
     /// - Tag: _Concurrency_AsyncSequence_erase_DoThrowAsyncSeq
     public func erase(_ next: @escaping (inout Self.AsyncIterator) async throws -> Element?) -> DoThrowAsyncSeq<Element> {
-        return DoThrowAsyncSeq(asyncIterator: {
+        return DoThrowAsyncSeq(unfolding: {
             var itr = self.makeAsyncIterator()
-            return DoThrowAsyncItr(nextElement: { try await next(&itr) })
+            return { try await next(&itr) }
         })
     }
 }
