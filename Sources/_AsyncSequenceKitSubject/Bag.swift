@@ -9,43 +9,34 @@
 
 import Foundation
 
-@usableFromInline
 internal struct BagKey: RawRepresentable, Equatable, Hashable {
-    @usableFromInline
     let rawValue: UInt
 
-    @usableFromInline
     init(rawValue: UInt) {
         self.rawValue = rawValue
     }
 
-    @usableFromInline
     func next() -> Self {
         return .init(rawValue: self.rawValue &+ 1)
     }
 
-    @usableFromInline
     static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.rawValue == rhs.rawValue
     }
 
-    @usableFromInline
     func hash(into hasher: inout Hasher) {
         hasher.combine(self.rawValue)
     }
 }
 
 
-@usableFromInline
 internal enum Bag<Element> {
-    @usableFromInline
     typealias Key = BagKey
 
     case empty
     case single(Key, Element)
     case many([Key: Element], nextKey: Key)
 
-    @usableFromInline
     var count: Int {
         switch self {
         case .empty:
@@ -57,7 +48,6 @@ internal enum Bag<Element> {
         }
     }
 
-    @usableFromInline
     mutating func add(_ element: Element) -> Key {
         switch self {
         case .empty:
@@ -78,7 +68,6 @@ internal enum Bag<Element> {
         }
     }
 
-    @usableFromInline
     mutating func remove(_ key: Key) {
         switch self {
         case .empty:
@@ -96,7 +85,6 @@ internal enum Bag<Element> {
         }
     }
 
-    @usableFromInline
     mutating func removeAll() {
         self = .empty
     }

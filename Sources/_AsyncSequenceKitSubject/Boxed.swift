@@ -15,7 +15,5 @@ internal final class Boxed<Value> {
         self.wrappedValue = wrappedValue
     }
 
-    var projectedValue: Boxed<Value> {
-        return self
-    }
+    var projectedValue: Boxed<Value> { self }
 }

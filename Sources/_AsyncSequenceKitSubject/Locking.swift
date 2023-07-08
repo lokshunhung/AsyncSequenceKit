@@ -54,6 +54,7 @@ internal final class AllocatedLock {
         _unlock(lock: self.ptr)
     }
 
+    @inline(__always) @usableFromInline
     func withLock<R>(_ body: () throws -> R) rethrows -> R {
         self.lock()
         defer { self.unlock() }
