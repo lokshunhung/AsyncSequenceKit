@@ -5,8 +5,6 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
-import Foundation
-
 public struct DoThrowBehaviorSubject<Element, Failure>
     where Failure: Swift.Error
 {   // TODO: AsyncThrowingStream.makeStream requires Failure to be Swift.Error

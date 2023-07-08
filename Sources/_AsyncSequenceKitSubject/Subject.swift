@@ -5,8 +5,6 @@
 //  Created by LS Hung on 02/07/2023.
 //
 
-import Foundation
-
 public protocol Subject<Element, Failure>
     where Failure: Swift.Error
 {

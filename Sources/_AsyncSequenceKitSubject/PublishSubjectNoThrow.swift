@@ -5,8 +5,6 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
-import Foundation
-
 public struct NoThrowPublishSubject<Element>: PublishSubject {
     public typealias Failure = Never
 

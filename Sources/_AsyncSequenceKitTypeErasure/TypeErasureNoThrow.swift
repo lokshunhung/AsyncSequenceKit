@@ -5,8 +5,6 @@
 //  Created by LS Hung on 01/07/2023.
 //
 
-import Foundation
-
 public struct NoThrowAsyncItr<Element>: _Concurrency.AsyncIteratorProtocol {
     let nextElement: () async -> Element?
 

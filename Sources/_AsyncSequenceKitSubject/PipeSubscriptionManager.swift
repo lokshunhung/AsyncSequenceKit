@@ -5,8 +5,6 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
-import Foundation
-
 internal final class PipeSubscriptionManager<Element, Failure>
     where Failure: Swift.Error
 {

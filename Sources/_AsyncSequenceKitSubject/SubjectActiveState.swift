@@ -5,8 +5,6 @@
 //  Created by LS Hung on 02/07/2023.
 //
 
-import Foundation
-
 @usableFromInline
 internal enum SubjectActiveState {
     case active

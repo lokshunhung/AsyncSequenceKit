@@ -5,8 +5,6 @@
 //  Created by LS Hung on 01/07/2023.
 //
 
-import Foundation
-
 extension _Concurrency.AsyncIteratorProtocol {
     /// Equivalent to `AsyncIteratorProtocol.next()`.
     /// Added to make type erasing calls less noisy.

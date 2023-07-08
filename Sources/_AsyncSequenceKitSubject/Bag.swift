@@ -7,8 +7,6 @@
 //  Created by LS Hung on 03/07/2023.
 //
 
-import Foundation
-
 internal struct BagKey: RawRepresentable, Equatable, Hashable {
     let rawValue: UInt
 
