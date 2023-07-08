@@ -14,11 +14,11 @@ final class AsyncSequenceKitTypeCheckingTests: XCTestCase {
         let noThrowStream = AsyncStream(Int.self, { continuation in continuation.finish() })
 
         let noThrowTypeErased = noThrowStream.erase({ await $0() })
-        XCTAssertEqual(String(describing: type(of: noThrowTypeErased)), "NoThrowAsyncSeq<Int>")
+        XCTAssertEqual(String(describing: type(of: noThrowTypeErased)), "AsyncStream<Int>")
 
         let doThrowStream = AsyncThrowingStream(Int.self, { continuation in continuation.finish() })
         let doThrowTypeErased = doThrowStream.erase({ try await $0() })
-        XCTAssertEqual(String(describing: type(of: doThrowTypeErased)), "DoThrowAsyncSeq<Int>")
+        XCTAssertEqual(String(describing: type(of: doThrowTypeErased)), "AsyncThrowingStream<Int, Error>")
     }
 
     func testTypeCheckForNoThrow() async throws {
@@ -51,12 +51,12 @@ final class AsyncSequenceKitTypeCheckingTests: XCTestCase {
         try XCTSkipIf(true, "Type annotation")
         let noThrowStream = AsyncStream(Int.self, { continuation in continuation.finish() })
 
-        let typeAnnotatedNoThrowTypeErased: NoThrowAsyncSeq<Int> = noThrowStream.erase({ await $0() })
-        let typeCastingNoThrowTypeErased = noThrowStream.erase({ await $0() }) as DoThrowAsyncSeq<Int>
+        let typeAnnotatedNoThrowTypeErased: AsyncStream<Int> = noThrowStream.erase({ await $0() })
+        let typeCastingNoThrowTypeErased = noThrowStream.erase({ await $0() }) as AsyncStream<Int>
         __("Works!", typeAnnotatedNoThrowTypeErased, typeCastingNoThrowTypeErased)
 
-        let typeAnnotatedDoThrowTypeErased: DoThrowAsyncSeq<Int> = noThrowStream.erase({ await $0() })
-        let typeCastingDoThrowTypeErased = noThrowStream.erase({ await $0() }) as DoThrowAsyncSeq<Int>
+        let typeAnnotatedDoThrowTypeErased: AsyncThrowingStream<Int, any Swift.Error> = noThrowStream.erase({ await $0() })
+        let typeCastingDoThrowTypeErased = noThrowStream.erase({ await $0() }) as AsyncThrowingStream<Int, any Swift.Error>
         __("Works!", typeAnnotatedDoThrowTypeErased, typeCastingDoThrowTypeErased)
 
         //let doThrowTypeErased = noThrowStream.erase({ try await $0() })
