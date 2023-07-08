@@ -7,6 +7,10 @@
 
 import AsyncSequenceKitSubject
 
+#if canImport(Combine)
+import Combine
+#endif
+
 @propertyWrapper
 public struct AsyncPublished<Value> {
     private let box: BoxedSubject
@@ -15,7 +19,25 @@ public struct AsyncPublished<Value> {
         self.box = BoxedSubject(subject: .init(wrappedValue))
     }
 
-    // TODO: hook into ObservableObject's objectWillChange
+    #if canImport(Combine)
+    public static subscript<T>(
+        _enclosingInstance instance: T,
+        wrapped wrappedKeyPath: ReferenceWritableKeyPath<T, Value>,
+        storage storageKeyPath: ReferenceWritableKeyPath<T, Self>
+    ) -> Value where T: Combine.ObservableObject,
+                     T.ObjectWillChangePublisher == Combine.ObservableObjectPublisher
+    {
+        get {
+            let `self` = instance
+            return self[keyPath: storageKeyPath].box.subject.value
+        }
+        set {
+            let `self` = instance
+            self.objectWillChange.send() // simulate `willSet { objectWillChange.send() }` accessor
+            self[keyPath: storageKeyPath].box.subject.next(newValue)
+        }
+    }
+    #else
     public static subscript<T>(
         _enclosingInstance instance: T,
         wrapped wrappedKeyPath: ReferenceWritableKeyPath<T, Value>,
@@ -30,6 +52,7 @@ public struct AsyncPublished<Value> {
             self[keyPath: storageKeyPath].box.subject.next(newValue)
         }
     }
+    #endif
 
     @available(*, unavailable, message: "@AsyncPublished can only be applied to class properties")
     public var wrappedValue: Value {
