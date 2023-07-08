@@ -21,7 +21,9 @@ public struct NoThrowPublishSubject<Element>: PublishSubject {
     fileprivate typealias Continuation = _Concurrency.AsyncStream<Element>.Continuation
 
     private let lock: AllocatedLock = .new()
-    private let subscriptionManager: SubscriptionManager
+    private let subscriptionManager: SubscriptionManager = .init()
+
+    public init() {}
 
     public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
         fileprivate let buffer: Buffer
@@ -48,6 +50,12 @@ extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
         // continuation.onTermination stores the cleanup logic
         // when the async iteration is terminated (e.g. enclosing Task is cancelled).
         continuation.onTermination = { [weak subscriptionManager] reason in
+            // Termination reason == .finished if continuation.finished() is being called
+            // in the locked region of subscriptionManager.complete().
+            // Calling subscriptionManager.remove(downstream:) here would try to acquire
+            // subscriptionManager.lock again, causing a runtime error.
+            // So instead, the removal of this downstream is handled in subscriptionManager.complete().
+            if case .finished = reason { return }
             subscriptionManager?.remove(downstream: downstreamID)
         }
 
@@ -85,44 +93,38 @@ extension NoThrowPublishSubject {
         private var downstreams: DownstreamStorage = .empty
 
         func add(downstream: Downstream) -> DownstreamID {
-            return self.lock.withLock {
-                self.downstreams.add(downstream)
-            }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            return self.downstreams.add(downstream)
         }
 
         func remove(downstream id: DownstreamID) {
-            self.lock.withLock {
-                self.downstreams.remove(id)
-            }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            self.downstreams.remove(id)
         }
 
         func next(_ value: Element) {
-            self.lock.withLock {
-                guard self.state.isActive else { return }
-                self.downstreams.forEach { continuation in
-                    continuation.yield(value)
-                }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            guard self.state.isActive else { return }
+            self.downstreams.forEach { continuation in
+                continuation.yield(value)
             }
         }
 
         func error(_ error: Failure) {}
 
         func complete() {
-            self.lock.withLock {
-                guard self.state.isActive else { return }
-                self.downstreams.forEach { continuation in
-                    continuation.finish()
-                }
-
-                self.state.deactivate()
-                self.downstreams.removeAll()
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            guard self.state.isActive else { return }
+            self.downstreams.forEach { continuation in
+                continuation.finish()
             }
-        }
-    }
-}
 
-extension NoThrowPublishSubject {
-    public init() {
-        self.init(subscriptionManager: SubscriptionManager())
+            self.state.deactivate()
+            self.downstreams.removeAll()
+        }
     }
 }

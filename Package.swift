@@ -34,5 +34,8 @@ let package = Package(
         .target(
             name: "_AsyncSequenceKitSubject",
             dependencies: []),
+        .testTarget(
+            name: "_AsyncSequenceKitSubjectTests",
+            dependencies: ["_AsyncSequenceKitSubject"]),
     ]
 )
