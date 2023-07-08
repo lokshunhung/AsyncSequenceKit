@@ -5,7 +5,7 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
-public struct DoThrowPublishSubject<Element, Failure>: PublishSubject
+public final class DoThrowPublishSubject<Element, Failure>: PublishSubject
     where Failure: Swift.Error
 {   // TODO: AsyncThrowingStream.makeStream requires Failure to be Swift.Error
     fileprivate typealias Pipe = _Concurrency.AsyncThrowingStream<Element, any Swift.Error>

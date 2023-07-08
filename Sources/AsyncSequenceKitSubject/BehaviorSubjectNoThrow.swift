@@ -5,7 +5,7 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
-public struct NoThrowBehaviorSubject<Element> {
+public final class NoThrowBehaviorSubject<Element> {
     public typealias Failure = Never
 
     fileprivate typealias Pipe = _Concurrency.AsyncStream<Element>
