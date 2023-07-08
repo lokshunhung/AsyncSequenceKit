@@ -13,96 +13,88 @@ public protocol BehaviorSubject<Element, Failure>: Subject
     associatedtype Element
     associatedtype Failure
 
-    var current: Element { get }
+    var value: Element { get }
 }
 
-public final class NoThrowBehaviorSubject<Element> {
+public struct NoThrowBehaviorSubject<Element> {
     public typealias Failure = Never
 
-    fileprivate typealias Buffer = _Concurrency.AsyncStream<Element>
-    fileprivate typealias Continuation = _Concurrency.AsyncStream<Element>.Continuation
-    fileprivate typealias FinalSelf = NoThrowBehaviorSubject<Element>
+    fileprivate typealias Pipe = _Concurrency.AsyncStream<Element>
 
     private let lock: AllocatedLock = .new()
-    private var currentValue: Element
-    private let buffer: Buffer
-    private let continuation: Continuation
-    private let asyncIterator: (FinalSelf) -> AsyncIterator
+    private let subscriptionManager: PipeSubscriptionManager<Element, Failure> = .init()
+    @Boxed private var currentValue: Element
 
-    private init(currentValue: Element,
-                 buffer: Buffer,
-                 continuation: Continuation,
-                 asyncIterator: @escaping (FinalSelf) -> AsyncIterator) {
-        self.currentValue = currentValue
-        self.buffer = buffer
-        self.continuation = continuation
-        self.asyncIterator = asyncIterator
+    public init(_ value: Element) {
+        self.currentValue = value
     }
 
     public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
-        fileprivate var initialValue: Element?
-        fileprivate var iterator: Buffer.AsyncIterator
-        fileprivate let parentSequence: NoThrowBehaviorSubject
+        fileprivate let pipe: Pipe
+        fileprivate var iterator: Pipe.AsyncIterator
+        fileprivate var initialValue: Optional<() -> Element?>
 
         public mutating func next() async -> Element? {
-            if let value = self.initialValue {
+            if let initialValue {
                 self.initialValue = nil
-                self.parentSequence.current = value
-                return initialValue
+                return initialValue()
             }
-
-            let value = await self.iterator.next()
-            if let value {
-                self.parentSequence.current = value
-            }
-            return value
+            return await self.iterator.next()
         }
     }
 }
 
 extension NoThrowBehaviorSubject: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
-        return self.asyncIterator(self)
+        self.lock.lock()
+        defer { self.lock.unlock() }
+
+        let (pipe, continuation) = Pipe.makeStream(bufferingPolicy: .unbounded)
+        let downstreamID = self.subscriptionManager.add(downstream: .init(continuation))
+
+        // AsyncSequence.makeAsyncIterator() is where an async iteration is requested.
+        // This is analogous to RxSwift.Observable.subscribe() or Combine.Publisher.sink()
+        //
+        // Like RxSwift.Disposable or Combine.Cancellable to hold/trigger cleanup logic,
+        // continuation.onTermination stores the cleanup logic
+        // when the async iteration is terminated (e.g. enclosing Task is cancelled).
+        continuation.onTermination = { [weak subscriptionManager] reason in
+            // Termination reason == .finished if continuation.finished() is being called
+            // in the locked region of subscriptionManager.complete().
+            // Calling subscriptionManager.remove(downstream:) here would try to acquire
+            // subscriptionManager.lock again, causing a runtime error.
+            // So instead, the removal of this downstream is handled in subscriptionManager.complete().
+            if case .finished = reason { return }
+            subscriptionManager?.remove(downstream: downstreamID)
+        }
+
+        let iterator = pipe.makeAsyncIterator()
+        return AsyncIterator(pipe: pipe, iterator: iterator) { [weak $currentValue] in
+            $currentValue?.wrappedValue
+        }
     }
 }
 
 extension NoThrowBehaviorSubject: BehaviorSubject {
-    public fileprivate(set) var current: Element {
-        get {
-            lock.lock()
-            defer { lock.unlock() }
-            return self.currentValue
-        }
-        set {
-            lock.lock()
-            defer { lock.unlock() }
-            self.currentValue = newValue
+    public var value: Element {
+        self.lock.withLock {
+            self.currentValue
         }
     }
 
     public func next(_ value: Element) {
-        self.continuation.yield(value)
+        self.lock.withLock {
+            self.currentValue = value
+            self.subscriptionManager.next(value)
+        }
     }
 
     public func error(_ error: Failure) {
     }
 
     public func complete() {
-        self.continuation.finish()
-    }
-}
-
-extension NoThrowBehaviorSubject {
-    public convenience init(_ value: Element) {
-        let (buffer, continuation) = Buffer.makeStream(of: Element.self, bufferingPolicy: .bufferingNewest(1))
-        self.init(
-            currentValue: value,
-            buffer: buffer, // TODO: Important: shared buffer?
-            continuation: continuation,
-            asyncIterator: {
-                let iterator = buffer.makeAsyncIterator()
-                return .init(initialValue: value, iterator: iterator, parentSequence: $0)
-            }
-        )
+        self.lock.withLock {
+            self.subscriptionManager.complete()
+        }
     }
 }
