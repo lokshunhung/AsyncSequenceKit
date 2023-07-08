@@ -15,6 +15,7 @@ public struct AsyncPublished<Value> {
         self.box = BoxedSubject(subject: .init(wrappedValue))
     }
 
+    // TODO: hook into ObservableObject's objectWillChange
     public static subscript<T>(
         _enclosingInstance instance: T,
         wrapped wrappedKeyPath: ReferenceWritableKeyPath<T, Value>,
@@ -36,12 +37,14 @@ public struct AsyncPublished<Value> {
     }
 
     public var projectedValue: AsyncStream<Value> {
+        // TODO: eager creation of the iterator isn't good, bring back NoThrowAsyncSeq
         var iterator = self.box.subject.makeAsyncIterator()
         return AsyncStream(unfolding: { await iterator.next() })
     }
 }
 
 private extension AsyncPublished {
+    // TODO: use reference type for Subject
     final class BoxedSubject {
         let subject: NoThrowBehaviorSubject<Value>
         init(subject: NoThrowBehaviorSubject<Value>) {
