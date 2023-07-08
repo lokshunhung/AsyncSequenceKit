@@ -1,15 +1,15 @@
 //
-//  AsyncSequenceKitTests.swift
+//  AsyncSequenceKitTypeCheckingTests.swift
 //
 //
 //  Created by LS Hung on 01/07/2023.
 //
 
 import XCTest
-@testable import AsyncSequenceKit
+@testable import _AsyncSequenceKitTypeErasure
 
 // Commented out code contains expected error
-final class AsyncSequenceKitTests: XCTestCase {
+final class AsyncSequenceKitTypeCheckingTests: XCTestCase {
     func testTypeInference() async throws {
         let noThrowStream = AsyncStream(Int.self, { continuation in continuation.finish() })
 
