@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import _AsyncSequenceKitTypeErasure
+@testable import AsyncSequenceKitTypeErasure
 
 // Sanity checks
 final class DoThrowTests: XCTestSuite {
