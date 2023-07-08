@@ -12,27 +12,33 @@ let package = Package(
         .library(
             name: "AsyncSequenceKit",
             targets: ["AsyncSequenceKit"]),
+        .library(
+            name: "AsyncSequenceKitTypeErasure",
+            targets: ["AsyncSequenceKitTypeErasure"]),
+        .library(
+            name: "AsyncSequenceKitSubject",
+            targets: ["AsyncSequenceKitSubject"]),
     ],
     targets: [
         .target(
             name: "AsyncSequenceKit",
             dependencies: [
-                "_AsyncSequenceKitTypeErasure",
-                "_AsyncSequenceKitSubject",
+                "AsyncSequenceKitTypeErasure",
+                "AsyncSequenceKitSubject",
             ]),
 
         .target(
-            name: "_AsyncSequenceKitTypeErasure",
+            name: "AsyncSequenceKitTypeErasure",
             dependencies: []),
         .testTarget(
-            name: "_AsyncSequenceKitTypeErasureTests",
-            dependencies: ["_AsyncSequenceKitTypeErasure"]),
+            name: "AsyncSequenceKitTypeErasureTests",
+            dependencies: ["AsyncSequenceKitTypeErasure"]),
 
         .target(
-            name: "_AsyncSequenceKitSubject",
+            name: "AsyncSequenceKitSubject",
             dependencies: []),
         .testTarget(
-            name: "_AsyncSequenceKitSubjectTests",
-            dependencies: ["_AsyncSequenceKitSubject"]),
+            name: "AsyncSequenceKitSubjectTests",
+            dependencies: ["AsyncSequenceKitSubject"]),
     ]
 )

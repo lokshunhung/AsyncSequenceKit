@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import _AsyncSequenceKitSubject
+@testable import AsyncSequenceKitSubject
 
 final class BehaviorSubjectTests: XCTestCase {
     func testSimplePublish() async throws {

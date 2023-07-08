@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import _AsyncSequenceKitTypeErasure
+@testable import AsyncSequenceKitTypeErasure
 
 // Commented out code contains expected error
 final class AsyncSequenceKitTypeCheckingTests: XCTestCase {
