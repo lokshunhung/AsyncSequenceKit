@@ -7,3 +7,4 @@
 
 @_exported import AsyncSequenceKitTypeErasure
 @_exported import AsyncSequenceKitSubject
+@_exported import AsyncSequenceKitPublished

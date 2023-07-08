@@ -18,6 +18,9 @@ let package = Package(
         .library(
             name: "AsyncSequenceKitSubject",
             targets: ["AsyncSequenceKitSubject"]),
+        .library(
+            name: "AsyncSequenceKitPublished",
+            targets: ["AsyncSequenceKitPublished"]),
     ],
     targets: [
         .target(
@@ -25,6 +28,7 @@ let package = Package(
             dependencies: [
                 "AsyncSequenceKitTypeErasure",
                 "AsyncSequenceKitSubject",
+                "AsyncSequenceKitPublished",
             ]),
 
         .target(
@@ -40,5 +44,12 @@ let package = Package(
         .testTarget(
             name: "AsyncSequenceKitSubjectTests",
             dependencies: ["AsyncSequenceKitSubject"]),
+
+        .target(
+            name: "AsyncSequenceKitPublished",
+            dependencies: []),
+        .testTarget(
+            name: "AsyncSequenceKitPublishedTests",
+            dependencies: ["AsyncSequenceKitPublished"]),
     ]
 )
