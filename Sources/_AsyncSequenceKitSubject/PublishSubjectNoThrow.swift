@@ -11,9 +11,10 @@ public struct NoThrowPublishSubject<Element>: PublishSubject {
     public typealias Failure = Never
 
     fileprivate typealias Pipe = _Concurrency.AsyncStream<Element>
+    private typealias SubscriptionManager = PipeSubscriptionManager<Element, Failure>
 
     private let lock: AllocatedLock = .new()
-    private let subscriptionManager: PipeSubscriptionManager<Element, Failure> = .init()
+    private let subscriptionManager: SubscriptionManager = .init()
 
     public init() {}
 

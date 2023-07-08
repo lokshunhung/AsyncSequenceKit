@@ -11,9 +11,10 @@ public struct DoThrowPublishSubject<Element, Failure>: PublishSubject
     where Failure: Swift.Error
 {   // TODO: AsyncThrowingStream.makeStream requires Failure to be Swift.Error
     fileprivate typealias Pipe = _Concurrency.AsyncThrowingStream<Element, any Swift.Error>
+    private typealias SubscriptionManager = PipeSubscriptionManager<Element, any Swift.Error>
 
     private let lock: AllocatedLock = .new()
-    private let subscriptionManager: PipeSubscriptionManager<Element, any Swift.Error> = .init()
+    private let subscriptionManager: SubscriptionManager = .init()
 
     public init() {}
 
