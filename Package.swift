@@ -25,9 +25,6 @@ let package = Package(
             name: "_AsyncSequenceKitTypeErasure",
             dependencies: []),
         .testTarget(
-            name: "_AsyncSequenceKitTypeErasureTypeCheckingTests",
-            dependencies: ["_AsyncSequenceKitTypeErasure"]),
-        .testTarget(
             name: "_AsyncSequenceKitTypeErasureTests",
             dependencies: ["_AsyncSequenceKitTypeErasure"]),
 
