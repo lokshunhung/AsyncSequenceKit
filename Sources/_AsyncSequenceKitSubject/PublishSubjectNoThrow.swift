@@ -10,7 +10,7 @@ import Foundation
 public struct NoThrowPublishSubject<Element>: PublishSubject {
     public typealias Failure = Never
 
-    fileprivate typealias Buffer = _Concurrency.AsyncStream<Element>
+    fileprivate typealias Pipe = _Concurrency.AsyncStream<Element>
 
     private let lock: AllocatedLock = .new()
     private let subscriptionManager: PipeSubscriptionManager<Element, Failure> = .init()
@@ -18,8 +18,8 @@ public struct NoThrowPublishSubject<Element>: PublishSubject {
     public init() {}
 
     public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
-        fileprivate let buffer: Buffer
-        fileprivate var iterator: Buffer.AsyncIterator
+        fileprivate let pipe: Pipe
+        fileprivate var iterator: Pipe.AsyncIterator
 
         public mutating func next() async -> Element? {
             return await self.iterator.next()
@@ -32,8 +32,8 @@ extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
         self.lock.lock()
         defer { self.lock.unlock() }
 
-        let (buffer, continuation) = Buffer.makeStream(bufferingPolicy: .unbounded)
-        let downstreamID = subscriptionManager.add(downstream: .init(continuation))
+        let (pipe, continuation) = Pipe.makeStream(bufferingPolicy: .unbounded)
+        let downstreamID = self.subscriptionManager.add(downstream: .init(continuation))
 
         // AsyncSequence.makeAsyncIterator() is where an async iteration is requested.
         // This is analogous to RxSwift.Observable.subscribe() or Combine.Publisher.sink()
@@ -51,8 +51,8 @@ extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
             subscriptionManager?.remove(downstream: downstreamID)
         }
 
-        let iterator = buffer.makeAsyncIterator()
-        return AsyncIterator(buffer: buffer, iterator: iterator)
+        let iterator = pipe.makeAsyncIterator()
+        return AsyncIterator(pipe: pipe, iterator: iterator)
     }
 }
 

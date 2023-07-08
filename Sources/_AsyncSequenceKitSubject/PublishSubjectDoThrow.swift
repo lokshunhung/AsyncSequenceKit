@@ -10,7 +10,7 @@ import Foundation
 public struct DoThrowPublishSubject<Element, Failure>: PublishSubject
     where Failure: Swift.Error
 {   // TODO: AsyncThrowingStream.makeStream requires Failure to be Swift.Error
-    fileprivate typealias Buffer = _Concurrency.AsyncThrowingStream<Element, any Swift.Error>
+    fileprivate typealias Pipe = _Concurrency.AsyncThrowingStream<Element, any Swift.Error>
 
     private let lock: AllocatedLock = .new()
     private let subscriptionManager: PipeSubscriptionManager<Element, any Swift.Error> = .init()
@@ -18,8 +18,8 @@ public struct DoThrowPublishSubject<Element, Failure>: PublishSubject
     public init() {}
 
     public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
-        fileprivate let buffer: Buffer
-        fileprivate var iterator: Buffer.AsyncIterator
+        fileprivate let pipe: Pipe
+        fileprivate var iterator: Pipe.AsyncIterator
 
         public mutating func next() async throws -> Element? {
             return try await self.iterator.next()
@@ -32,8 +32,8 @@ extension DoThrowPublishSubject: _Concurrency.AsyncSequence {
         self.lock.lock()
         defer { self.lock.unlock() }
 
-        let (buffer, continuation) = Buffer.makeStream(bufferingPolicy: .unbounded)
-        let downstreamID = subscriptionManager.add(downstream: .init(continuation))
+        let (pipe, continuation) = Pipe.makeStream(bufferingPolicy: .unbounded)
+        let downstreamID = self.subscriptionManager.add(downstream: .init(continuation))
 
         // AsyncSequence.makeAsyncIterator() is where an async iteration is requested.
         // This is analogous to RxSwift.Observable.subscribe() or Combine.Publisher.sink()
@@ -51,8 +51,8 @@ extension DoThrowPublishSubject: _Concurrency.AsyncSequence {
             subscriptionManager?.remove(downstream: downstreamID)
         }
 
-        let iterator = buffer.makeAsyncIterator()
-        return AsyncIterator(buffer: buffer, iterator: iterator)
+        let iterator = pipe.makeAsyncIterator()
+        return AsyncIterator(pipe: pipe, iterator: iterator)
     }
 }
 
