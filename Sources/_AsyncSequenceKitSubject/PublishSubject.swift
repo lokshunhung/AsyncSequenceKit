@@ -18,10 +18,9 @@ public struct NoThrowPublishSubject<Element>: PublishSubject {
     public typealias Failure = Never
 
     fileprivate typealias Buffer = _Concurrency.AsyncStream<Element>
-    fileprivate typealias Continuation = _Concurrency.AsyncStream<Element>.Continuation
 
     private let lock: AllocatedLock = .new()
-    private let subscriptionManager: SubscriptionManager = .init()
+    private let subscriptionManager: PipeSubscriptionManager<Element, Failure> = .init()
 
     public init() {}
 
@@ -40,8 +39,8 @@ extension NoThrowPublishSubject: _Concurrency.AsyncSequence {
         self.lock.lock()
         defer { self.lock.unlock() }
 
-        let (buffer, continuation) = Buffer.makeStream(of: Element.self, bufferingPolicy: .unbounded)
-        let downstreamID = subscriptionManager.add(downstream: continuation)
+        let (buffer, continuation) = Buffer.makeStream(bufferingPolicy: .unbounded)
+        let downstreamID = subscriptionManager.add(downstream: .init(continuation))
 
         // AsyncSequence.makeAsyncIterator() is where an async iteration is requested.
         // This is analogous to RxSwift.Observable.subscribe() or Combine.Publisher.sink()
@@ -77,54 +76,6 @@ extension NoThrowPublishSubject: Subject {
     public func complete() {
         self.lock.withLock {
             self.subscriptionManager.complete()
-        }
-    }
-}
-
-extension NoThrowPublishSubject {
-    // TODO: refactor to generic using a conduit, instead of relying on concrete Buffer.Continuation
-    fileprivate final class SubscriptionManager {
-        typealias Downstream = Buffer.Continuation
-        typealias DownstreamStorage = Bag<Downstream>
-        typealias DownstreamID = DownstreamStorage.Key
-
-        private let lock: AllocatedLock = .new()
-        private var state: SubjectActiveState = .active
-        private var downstreams: DownstreamStorage = .empty
-
-        func add(downstream: Downstream) -> DownstreamID {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            return self.downstreams.add(downstream)
-        }
-
-        func remove(downstream id: DownstreamID) {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            self.downstreams.remove(id)
-        }
-
-        func next(_ value: Element) {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            guard self.state.isActive else { return }
-            self.downstreams.forEach { continuation in
-                continuation.yield(value)
-            }
-        }
-
-        func error(_ error: Failure) {}
-
-        func complete() {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            guard self.state.isActive else { return }
-            self.downstreams.forEach { continuation in
-                continuation.finish()
-            }
-
-            self.state.deactivate()
-            self.downstreams.removeAll()
         }
     }
 }
