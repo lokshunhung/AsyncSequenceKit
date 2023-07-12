@@ -39,19 +39,19 @@ public struct NoThrowBehaviorSubject<Element> {
 
 extension NoThrowBehaviorSubject: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
+        return self.makeAsyncIterator(withTerminationHandler: nil)
+    }
+
+    public func makeAsyncIterator(withTerminationHandler onTermination: Optional<() -> Void>) -> AsyncIterator {
         self.lock.lock()
         defer { self.lock.unlock() }
 
         let (pipe, continuation) = Pipe.makeStream(bufferingPolicy: .unbounded)
         let downstreamID = self.subscriptionManager.add(downstream: .init(continuation))
 
-        // AsyncSequence.makeAsyncIterator() is where an async iteration is requested.
-        // This is analogous to RxSwift.Observable.subscribe() or Combine.Publisher.sink()
-        //
-        // Like RxSwift.Disposable or Combine.Cancellable to hold/trigger cleanup logic,
-        // continuation.onTermination stores the cleanup logic
-        // when the async iteration is terminated (e.g. enclosing Task is cancelled).
+        // See: [Subject.makeAsyncIterator(withTerminationHandler:)](x-source-tag://Subject_makeAsyncIterator_withTerminationHandler)
         continuation.onTermination = { [weak subscriptionManager] reason in
+            onTermination?()
             // Termination reason == .finished if continuation.finished() is being called
             // in the locked region of subscriptionManager.complete().
             // Calling subscriptionManager.remove(downstream:) here would try to acquire

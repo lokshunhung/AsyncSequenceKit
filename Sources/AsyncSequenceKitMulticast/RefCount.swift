@@ -31,12 +31,18 @@ public struct RefCount<Upstream>
 }
 
 extension RefCount: _Concurrency.AsyncSequence {
+    private func onDownstreamTermination() {
+        self.lock.withLock {
+            self.state.decrement()
+        }
+    }
+
     public func makeAsyncIterator() -> AsyncIterator {
         self.lock.lock()
         defer { self.lock.unlock() }
 
         self.state.increment(connecting: self.upstream)
-        let iterator = self.upstream.makeAsyncIterator() // TODO: where to call self.state.decrement()?
+        let iterator = self.upstream.makeAsyncIterator(withTerminationHandler: self.onDownstreamTermination)
         return AsyncIterator(iterator: iterator)
     }
 }

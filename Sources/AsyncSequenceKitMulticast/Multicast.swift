@@ -33,8 +33,12 @@ public struct Multicast<Upstream, Subject>
 
 extension Multicast: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
+        self.makeAsyncIterator(withTerminationHandler: nil)
+    }
+
+    public func makeAsyncIterator(withTerminationHandler onTermination: Optional<() -> Void>) -> Self.AsyncIterator {
         let subject = self.subject
-        let iterator = subject.makeAsyncIterator()
+        let iterator = subject.makeAsyncIterator(withTerminationHandler: onTermination)
         return AsyncIterator(iterator: iterator)
     }
 }
