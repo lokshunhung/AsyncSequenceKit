@@ -5,6 +5,8 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
+import class AsyncSequenceKitPlatform.AllocatedLock
+
 public struct DoThrowPublishSubject<Element, Failure>: PublishSubject
     where Failure: Swift.Error
 {   // TODO: AsyncThrowingStream.makeStream requires Failure to be Swift.Error

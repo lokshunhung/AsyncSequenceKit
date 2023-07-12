@@ -5,7 +5,8 @@
 //  Created by LS Hung on 02/07/2023.
 //
 
-public protocol Subject<Element, Failure>
+@rethrows
+public protocol Subject<Element, Failure>: _Concurrency.AsyncSequence
     where Failure: Swift.Error
 {
     associatedtype Element

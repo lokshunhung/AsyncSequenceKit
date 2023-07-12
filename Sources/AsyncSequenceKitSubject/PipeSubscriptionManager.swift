@@ -5,6 +5,8 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
+import class AsyncSequenceKitPlatform.AllocatedLock
+
 internal final class PipeSubscriptionManager<Element, Failure>
     where Failure: Swift.Error
 {

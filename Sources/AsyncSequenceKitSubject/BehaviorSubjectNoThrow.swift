@@ -5,6 +5,9 @@
 //  Created by LS Hung on 08/07/2023.
 //
 
+import class AsyncSequenceKitPlatform.AllocatedLock
+import class AsyncSequenceKitPlatform.Boxed
+
 public struct NoThrowBehaviorSubject<Element> {
     public typealias Failure = Never
 

@@ -26,16 +26,52 @@ typealias LockPrimitive = SRWLOCK
 
 internal typealias LockPtr = UnsafeMutablePointer<LockPrimitive>
 
-// MARK: - AllocatedLock
+// MARK: RawLock
 
-internal final class AllocatedLock {
+public struct RawLock {
     private let ptr: LockPtr
 
     private init(ptr: LockPtr) {
         self.ptr = ptr
     }
 
-    static func new() -> Self {
+    public static func allocate() -> Self {
+        let ptr = LockPtr.allocate(capacity: 1)
+        _initialize(lock: ptr)
+        return self.init(ptr: ptr)
+    }
+
+    public func deallocate() {
+        _deinitialize(lock: self.ptr)
+        self.ptr.deinitialize(count: 1)
+    }
+
+    public func lock() {
+        _lock(lock: self.ptr)
+    }
+
+    public func unlock() {
+        _unlock(lock: self.ptr)
+    }
+
+    @inline(__always) @inlinable
+    public func withLock<R>(_ body: () throws -> R) rethrows -> R {
+        self.lock()
+        defer { self.unlock() }
+        return try body()
+    }
+}
+
+// MARK: - AllocatedLock
+
+public final class AllocatedLock {
+    private let ptr: LockPtr
+
+    private init(ptr: LockPtr) {
+        self.ptr = ptr
+    }
+
+    public static func new() -> Self {
         let ptr = LockPtr.allocate(capacity: 1)
         _initialize(lock: ptr)
         return self.init(ptr: ptr)
@@ -46,16 +82,16 @@ internal final class AllocatedLock {
         self.ptr.deinitialize(count: 1)
     }
 
-    func lock() {
+    public func lock() {
         _lock(lock: self.ptr)
     }
 
-    func unlock() {
+    public func unlock() {
         _unlock(lock: self.ptr)
     }
 
-    @inline(__always) @usableFromInline
-    func withLock<R>(_ body: () throws -> R) rethrows -> R {
+    @inline(__always) @inlinable
+    public func withLock<R>(_ body: () throws -> R) rethrows -> R {
         self.lock()
         defer { self.unlock() }
         return try body()
@@ -64,13 +100,13 @@ internal final class AllocatedLock {
 
 // MARK: - Lockable<State>
 
-internal struct Lockable<State> {
+public struct Lockable<State> {
     private typealias StatePtr = UnsafeMutablePointer<State>
     private typealias Buffer = ManagedBuffer<State, LockPrimitive>
 
     private let buffer: Buffer
 
-    init(_ state: State) {
+    public init(_ state: State) {
         self.buffer = RefCountBuffer.create(minimumCapacity: 1, makingHeaderWith: { (buffer: Buffer) in
             buffer.withUnsafeMutablePointerToElements { (lock: LockPtr) in
                 _initialize(lock: lock)
@@ -79,7 +115,7 @@ internal struct Lockable<State> {
         })
     }
 
-    func withLock<R>(_ body: (inout State) throws -> R) rethrows -> R {
+    public func withLock<R>(_ body: (inout State) throws -> R) rethrows -> R {
         return try self.buffer.withUnsafeMutablePointers { (state: StatePtr, lock: LockPtr) in
             _lock(lock: lock)
             defer { _unlock(lock: lock) }
