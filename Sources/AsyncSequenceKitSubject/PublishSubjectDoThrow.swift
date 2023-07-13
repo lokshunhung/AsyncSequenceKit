@@ -11,49 +11,55 @@ public struct DoThrowPublishSubject<Element, Failure>: PublishSubject
     where Failure: Swift.Error
 {   // TODO: AsyncThrowingStream.makeStream requires Failure to be Swift.Error
     fileprivate typealias Pipe = _Concurrency.AsyncThrowingStream<Element, any Swift.Error>
-    private typealias SubscriptionManager = PipeSubscriptionManager<Element, any Swift.Error>
+    fileprivate typealias SubscriptionManager = PipeSubscriptionManager<Element, any Swift.Error>
 
     private let lock: AllocatedLock = .new()
     private let subscriptionManager: SubscriptionManager = .init()
 
     public init() {}
-
-    public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
-        fileprivate let pipe: Pipe
-        fileprivate var iterator: Pipe.AsyncIterator
-
-        public mutating func next() async throws -> Element? {
-            return try await self.iterator.next()
-        }
-    }
 }
 
 extension DoThrowPublishSubject: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
-        return self.makeAsyncIterator(withTerminationHandler: nil)
+        return self.lock.withLock {
+            AsyncIterator.new(self.subscriptionManager)
+        }
     }
 
-    public func makeAsyncIterator(withTerminationHandler onTermination: Optional<() -> Void>) -> AsyncIterator {
-        self.lock.lock()
-        defer { self.lock.unlock() }
+    public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol, TerminationSideEffectAssignable {
+        private weak var subscriptionManager: SubscriptionManager?
+        private let pipe: Pipe
+        private let continuation: Pipe.Continuation
+        private let downstreamID: SubscriptionManager.DownstreamID
+        private var iterator: Pipe.AsyncIterator
 
-        let (pipe, continuation) = Pipe.makeStream(bufferingPolicy: .unbounded)
-        let downstreamID = self.subscriptionManager.add(downstream: .init(continuation))
-
-        // See: [Subject.makeAsyncIterator(withTerminationHandler:)](x-source-tag://Subject_makeAsyncIterator_withTerminationHandler)
-        continuation.onTermination = { [weak subscriptionManager] reason in
-            onTermination?()
-            // Termination reason == .finished if continuation.finished() is being called
-            // in the locked region of subscriptionManager.complete().
-            // Calling subscriptionManager.remove(downstream:) here would try to acquire
-            // subscriptionManager.lock again, causing a runtime error.
-            // So instead, the removal of this downstream is handled in subscriptionManager.complete().
-            if case .finished = reason { return }
-            subscriptionManager?.remove(downstream: downstreamID)
+        public var onTermination: Optional<() -> Void> = nil {
+            didSet { self.bindOnTermination() }
         }
 
-        let iterator = pipe.makeAsyncIterator()
-        return AsyncIterator(pipe: pipe, iterator: iterator)
+        fileprivate static func new(_ subscriptionManager: SubscriptionManager) -> Self {
+            let (pipe, continuation) = Pipe.makeStream(bufferingPolicy: .unbounded)
+            let downstreamID = subscriptionManager.add(downstream: .init(continuation))
+            let iterator = pipe.makeAsyncIterator()
+            let `self` = Self(subscriptionManager: subscriptionManager,
+                              pipe: pipe, continuation: continuation,
+                              downstreamID: downstreamID,
+                              iterator: iterator)
+            self.bindOnTermination()
+            return self
+        }
+
+        private func bindOnTermination() {
+            self.continuation.onTermination = { [self] reason in
+                self.onTermination?()
+                if case .finished = reason { return }
+                self.subscriptionManager?.remove(downstream: self.downstreamID)
+            }
+        }
+
+        public mutating func next() async throws -> Element? {
+            return try await self.iterator.next()
+        }
     }
 }
 

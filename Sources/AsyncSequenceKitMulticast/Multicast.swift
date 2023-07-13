@@ -22,8 +22,13 @@ public struct Multicast<Upstream, Subject>
         self._subject = LazyBoxed(factory: subjectFactory)
     }
 
-    public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol {
+    public struct AsyncIterator: _Concurrency.AsyncIteratorProtocol, TerminationSideEffectAssignable {
         fileprivate var iterator: Subject.AsyncIterator
+
+        public var onTermination: Optional<() -> Void> {
+            get { iterator.onTermination }
+            set { iterator.onTermination = newValue }
+        }
 
         public mutating func next() async rethrows -> Element? {
             return try await self.iterator.next()
@@ -33,12 +38,8 @@ public struct Multicast<Upstream, Subject>
 
 extension Multicast: _Concurrency.AsyncSequence {
     public func makeAsyncIterator() -> AsyncIterator {
-        self.makeAsyncIterator(withTerminationHandler: nil)
-    }
-
-    public func makeAsyncIterator(withTerminationHandler onTermination: Optional<() -> Void>) -> Self.AsyncIterator {
         let subject = self.subject
-        let iterator = subject.makeAsyncIterator(withTerminationHandler: onTermination)
+        let iterator = subject.makeAsyncIterator()
         return AsyncIterator(iterator: iterator)
     }
 }
@@ -51,6 +52,7 @@ extension Multicast: Connectable {
         return Task {
             do {
                 for try await value in self.upstream {
+                    try Task.checkCancellation()
                     subject.next(value)
                 }
                 subject.complete()

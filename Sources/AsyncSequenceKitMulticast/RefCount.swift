@@ -42,7 +42,8 @@ extension RefCount: _Concurrency.AsyncSequence {
         defer { self.lock.unlock() }
 
         self.state.increment(connecting: self.upstream)
-        let iterator = self.upstream.makeAsyncIterator(withTerminationHandler: self.onDownstreamTermination)
+        var iterator = self.upstream.makeAsyncIterator()
+        iterator.onTermination = self.onDownstreamTermination
         return AsyncIterator(iterator: iterator)
     }
 }
